@@ -1,0 +1,4 @@
+# One ComfyUI/custom_nodes directory name per line.
+# Example:
+# ComfyUI-Manager
+# comfy-manga-rework
