@@ -131,9 +131,9 @@ async def update_extension(request):
             return web.json_response({'error': str(error)}, status=400)
         except OSError as error:
             return web.json_response({'error': str(error)}, status=409)
-        if result['errors'] and not result['changed']:
+        if result['errors']:
             return web.json_response({
                 **result,
-                'error': 'No extension was updated; one or more pulls failed.',
+                'error': 'One or more extensions could not be updated; ComfyUI will not be restarted.',
             }, status=409)
         return web.json_response({**result, 'boot_id': BOOT_ID})
