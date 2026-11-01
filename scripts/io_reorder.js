@@ -189,7 +189,8 @@ app.registerExtension({
   setup() {
     app.ui.settings.addSetting({
       id: SETTING_ID,
-      name: "Comfy UI Additions: IO Reorder",
+      category: ["Comfy UI Additions"],
+      name: "IO Reorder",
       type: "boolean",
       defaultValue: true,
       tooltip: "Show Up/Down commands on subgraph input/output slot menus.",
