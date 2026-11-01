@@ -1,4 +1,7 @@
-# One ComfyUI/custom_nodes directory name per line.
-# Example:
-# ComfyUI-Manager
-# comfy-manga-rework
+comfy-manga-rework
+comfy-ui-additions
+comfy-pose-synthesis
+comfy-sakura-moon
+comfy-yanp
+comfy-metaprompt
+comfy-couple-guidance
