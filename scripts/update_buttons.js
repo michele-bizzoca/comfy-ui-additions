@@ -45,7 +45,13 @@ async function updateAndRestart() {
     const result = await response.json();
     if (!response.ok) {
       if (result.output) console.info("[Comfy UI Additions]", result.output);
-      if (result.errors) console.error("[Comfy UI Additions] Errori di aggiornamento:", result.errors);
+      if (result.errors?.length) {
+        console.error("[Comfy UI Additions] Repository non aggiornati:", result.errors);
+        const failedRepositories = result.errors.map(item => item.extension).filter(Boolean);
+        if (failedRepositories.length) {
+          throw new Error(`Pull non riuscito per: ${failedRepositories.join(", ")}. ComfyUI non verrà riavviato.`);
+        }
+      }
       throw new Error(result.error || "Aggiornamento non riuscito");
     }
     console.info("[Comfy UI Additions]", result.output);
