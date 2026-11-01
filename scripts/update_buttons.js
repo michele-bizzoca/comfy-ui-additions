@@ -37,23 +37,30 @@ async function updateAndRestart() {
   if (running) return true;
   running = true;
   const toast = app.extensionManager.toast;
-  let progress = toast.loading("Comfy Manga Rework: aggiornamento in corso");
+  let progress = toast.loading("Aggiornamento delle estensioni in corso");
   try {
     const response = await api.fetchApi("/manga-rework/update", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "Pull non riuscito");
-    console.info("[Comfy Manga Rework]", result.output);
+    if (!response.ok) {
+      if (result.output) console.info("[Comfy UI Additions]", result.output);
+      if (result.errors) console.error("[Comfy UI Additions] Errori di aggiornamento:", result.errors);
+      throw new Error(result.error || "Aggiornamento non riuscito");
+    }
+    console.info("[Comfy UI Additions]", result.output);
+    if (result.errors?.length) {
+      console.error("[Comfy UI Additions] Alcune estensioni non sono state aggiornate:", result.errors);
+    }
     toast.dismiss(progress);
     if (result.changed !== true) {
-      toast.info("Comfy Manga Rework è già aggiornato. Nessun riavvio necessario.");
+      toast.info("Tutte le estensioni sono già aggiornate. Nessun riavvio necessario.");
       return true;
     }
     progress = toast.loading("Riavvio di ComfyUI in corso");
     await restartAndReload(result.boot_id);
   } catch (error) {
-    toast.error("Comfy Manga Rework", { description: error.message || String(error), duration: 15000 });
+    toast.error("Comfy UI Additions", { description: error.message || String(error), duration: 15000 });
   } finally {
     toast.dismiss(progress);
     running = false;
@@ -73,7 +80,7 @@ async function restartOnly() {
     if (status.busy) throw new Error("Attendi che la coda di ComfyUI sia vuota prima di riavviare.");
     await restartAndReload(status.boot_id);
   } catch (error) {
-    toast.error("Comfy Manga Rework", { description: error.message || String(error), duration: 15000 });
+    toast.error("Comfy UI Additions", { description: error.message || String(error), duration: 15000 });
   } finally {
     toast.dismiss(progress);
     running = false;
@@ -96,15 +103,15 @@ app.registerExtension({
     document.head.appendChild(style);
     app.extensionManager.registerSidebarTab({
       id: "manga_rework_update_restart", type: "custom",
-      title: "Update Manga Rework", label: "Update",
-      tooltip: "Aggiorna Comfy Manga Rework e riavvia ComfyUI",
+      title: "Update Extensions", label: "Update",
+      tooltip: "Aggiorna le estensioni elencate in extensions.txt e riavvia ComfyUI se almeno una cambia",
       icon: "pi pi-refresh", render() {},
       onToggle: updateAndRestart
     });
     app.extensionManager.registerSidebarTab({
       id: "manga_rework_restart", type: "custom",
       title: "Restart ComfyUI", label: "Restart",
-      tooltip: "Riavvia ComfyUI senza aggiornare l’estensione",
+      tooltip: "Riavvia ComfyUI senza aggiornare le estensioni",
       icon: "icon-[lucide--play]", render() {},
       onToggle: restartOnly
     });

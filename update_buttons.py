@@ -1,4 +1,4 @@
-"""Explicit update action for this extension; restart remains Manager-owned."""
+"""Update configured ComfyUI extensions; restart remains Manager-owned."""
 import asyncio
 import os
 import uuid
@@ -9,6 +9,8 @@ from aiohttp import web
 from server import PromptServer
 
 ROOT = Path(__file__).resolve().parent
+CUSTOM_NODES = ROOT.parent.resolve()
+EXTENSIONS_FILE = ROOT / "extensions.txt"
 BOOT_ID = uuid.uuid4().hex
 _lock = asyncio.Lock()
 
@@ -29,12 +31,13 @@ async def repository_head(root, env):
 
 
 async def pull_repository(root):
+    root = root.resolve()
     env = dict(os.environ, GIT_TERMINAL_PROMPT='0')
     probe = await asyncio.create_subprocess_exec(
         'git', '-C', str(root), 'rev-parse', '--show-toplevel',
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env)
     top, error = await probe.communicate()
-    if probe.returncode or Path(os.fsdecode(top).strip()).resolve() != root.resolve():
+    if probe.returncode or Path(os.fsdecode(top).strip()).resolve() != root:
         raise RuntimeError('The extension directory must be its own Git checkout')
     before = await repository_head(root, env)
     process = await asyncio.create_subprocess_exec(
@@ -46,11 +49,49 @@ async def pull_repository(root):
         process.kill()
         await process.communicate()
         raise
-    text = output.decode('utf-8', errors='replace').strip()
+    output_text = output.decode('utf-8', errors='replace').strip()
     if process.returncode:
-        raise RuntimeError(text or f'git pull exited with {process.returncode}')
+        raise RuntimeError(output_text or f'git pull exited with {process.returncode}')
     after = await repository_head(root, env)
-    return {'output': text, 'changed': before != after, 'before': before, 'after': after}
+    return {'output': output_text, 'changed': before != after, 'before': before, 'after': after}
+
+
+def configured_extensions():
+    if not EXTENSIONS_FILE.is_file():
+        raise FileNotFoundError(f'Missing extension list: {EXTENSIONS_FILE.name}')
+    names = []
+    for raw_line in EXTENSIONS_FILE.read_text(encoding='utf-8').splitlines():
+        name = raw_line.strip()
+        if not name or name.startswith('#'):
+            continue
+        if name in {'.', '..'} or '/' in name or '\\' in name:
+            raise ValueError(f'Invalid extension directory name: {name!r}')
+        if name not in names:
+            names.append(name)
+    if not names:
+        raise ValueError(f'{EXTENSIONS_FILE.name} does not contain any extension directories')
+    return names
+
+
+async def pull_configured_extensions():
+    results = []
+    errors = []
+    changed = False
+    for name in configured_extensions():
+        extension_path = (CUSTOM_NODES / name).resolve()
+        if extension_path.parent != CUSTOM_NODES or not extension_path.is_dir():
+            errors.append({'extension': name, 'error': 'Extension directory was not found directly inside custom_nodes'})
+            continue
+        try:
+            result = await pull_repository(extension_path)
+            changed = changed or result['changed']
+            results.append({'extension': name, **result})
+        except (OSError, RuntimeError, asyncio.TimeoutError) as error:
+            errors.append({'extension': name, 'error': str(error) or error.__class__.__name__})
+    output = '\n\n'.join(
+        f"[{item['extension']}]\n{item['output']}" for item in results
+    )
+    return {'changed': changed, 'extensions': results, 'errors': errors, 'output': output}
 
 
 @PromptServer.instance.routes.get('/manga-rework/update-status')
@@ -83,9 +124,16 @@ async def update_extension(request):
         if not reboot_available:
             return web.json_response({'error': 'ComfyUI-Manager restart endpoint is unavailable'}, status=503)
         try:
-            result = await pull_repository(ROOT)
-        except asyncio.TimeoutError:
-            return web.json_response({'error': 'Git update timed out; no restart requested'}, status=504)
-        except (OSError, RuntimeError) as error:
+            result = await pull_configured_extensions()
+        except FileNotFoundError as error:
+            return web.json_response({'error': str(error)}, status=404)
+        except ValueError as error:
+            return web.json_response({'error': str(error)}, status=400)
+        except OSError as error:
             return web.json_response({'error': str(error)}, status=409)
+        if result['errors']:
+            return web.json_response({
+                **result,
+                'error': 'One or more extensions could not be updated; ComfyUI will not be restarted.',
+            }, status=409)
         return web.json_response({**result, 'boot_id': BOOT_ID})
