@@ -1,5 +1,6 @@
 """Update configured ComfyUI extensions; restart remains Manager-owned."""
 import asyncio
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -11,6 +12,7 @@ from server import PromptServer
 ROOT = Path(__file__).resolve().parent
 CUSTOM_NODES = ROOT.parent.resolve()
 EXTENSIONS_FILE = ROOT / "extensions.txt"
+logger = logging.getLogger(__name__)
 BOOT_ID = uuid.uuid4().hex
 _lock = asyncio.Lock()
 
@@ -58,6 +60,7 @@ async def pull_repository(root):
 
 def configured_extensions():
     if not EXTENSIONS_FILE.is_file():
+        logger.error("[Comfy UI Additions] File extensions.txt non trovato: %s", EXTENSIONS_FILE)
         raise FileNotFoundError(f'Missing extension list: {EXTENSIONS_FILE.name}')
     names = []
     for raw_line in EXTENSIONS_FILE.read_text(encoding='utf-8').splitlines():
