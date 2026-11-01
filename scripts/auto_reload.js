@@ -11,7 +11,8 @@ app.registerExtension({
     async setup() {
         app.ui.settings.addSetting({
             id: SETTING_ID,
-            name: "Comfy UI Additions: Auto Reload",
+            category: ["Comfy UI Additions"],
+            name: "Auto Reload",
             type: "boolean",
             defaultValue: true,
             tooltip: "Reload this browser tab when the ComfyUI backend process restarts. Unsaved UI changes may be lost.",
