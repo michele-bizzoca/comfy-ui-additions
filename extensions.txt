@@ -1,7 +1,0 @@
-comfy-manga-rework
-comfy-ui-additions
-comfy-pose-synthesis
-comfy-sakura-moon
-comfy-yanp
-comfy-metaprompt
-comfy-couple-guidance
